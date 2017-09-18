@@ -339,17 +339,11 @@ class DagFileProcessor(AbstractDagFileProcessor):
                 threading.current_thread().name = thread_name
                 start_time = time.time()
 
-                logging.info("Started process (PID=%s) to work on %s",
-                             os.getpid(),
-                             file_path)
                 scheduler_job = SchedulerJob(dag_ids=dag_id_white_list)
                 result = scheduler_job.process_file(file_path,
                                                     pickle_dags)
                 result_queue.put(result)
                 end_time = time.time()
-                logging.info("Processing %s took %.3f seconds",
-                             file_path,
-                             end_time - start_time)
             except:
                 # Log exceptions through the logging framework.
                 logging.exception("Got an exception! Propagating...")
@@ -997,12 +991,10 @@ class SchedulerJob(BaseJob):
 
         # Put one task instance on each line
         if len(task_instances_to_examine) == 0:
-            self.logger.info("No tasks to send to the executor")
             return
 
         task_instance_str = "\n\t".join(
             ["{}".format(x) for x in task_instances_to_examine])
-        self.logger.info("Tasks up for execution:\n\t{}".format(task_instance_str))
 
         # Get the pool settings
         pools = {p.pool: p for p in session.query(models.Pool).all()}
@@ -1353,7 +1345,6 @@ class SchedulerJob(BaseJob):
         self.executor.start()
 
         session = settings.Session()
-        self.logger.info("Resetting state for orphaned tasks")
         # grab orphaned tasks and make sure to reset their state
         active_runs = DagRun.find(
             state=State.RUNNING,
@@ -1362,8 +1353,6 @@ class SchedulerJob(BaseJob):
             no_backfills=True,
         )
         for dr in active_runs:
-            self.logger.info("Resetting {} {}".format(dr.dag_id,
-                                                      dr.execution_date))
             self.reset_state_for_orphaned_tasks(dr, session=session)
 
         session.close()
@@ -1393,18 +1382,16 @@ class SchedulerJob(BaseJob):
 
             if elapsed_time_since_refresh > self.dag_dir_list_interval:
                 # Build up a list of Python files that could contain DAGs
-                self.logger.info("Searching for files in {}".format(self.subdir))
+
                 known_file_paths = list_py_file_paths(self.subdir)
                 last_dag_dir_refresh_time = datetime.now()
-                self.logger.info("There are {} files in {}"
-                                 .format(len(known_file_paths), self.subdir))
+
                 processor_manager.set_file_paths(known_file_paths)
 
                 self.logger.debug("Removing old import errors")
                 self.clear_nonexistent_import_errors(known_file_paths=known_file_paths)
 
             # Kick of new processes and collect results from finished ones
-            self.logger.info("Heartbeating the process manager")
             simple_dags = processor_manager.heartbeat()
 
             if self.using_sqlite:
@@ -1440,7 +1427,6 @@ class SchedulerJob(BaseJob):
                                              (State.SCHEDULED,))
 
             # Call hearbeats
-            self.logger.info("Heartbeating the executor")
             self.executor.heartbeat()
 
             # Process events from the executor
@@ -1450,7 +1436,6 @@ class SchedulerJob(BaseJob):
             time_since_last_heartbeat = (datetime.now() -
                                          last_self_heartbeat_time).total_seconds()
             if time_since_last_heartbeat > self.heartrate:
-                self.logger.info("Heartbeating the scheduler")
                 self.heartbeat()
                 last_self_heartbeat_time = datetime.now()
 
@@ -1471,8 +1456,6 @@ class SchedulerJob(BaseJob):
 
             # Exit early for a test mode
             if processor_manager.max_runs_reached():
-                self.logger.info("Exiting loop as all files have been processed "
-                                 "{} times".format(self.num_runs))
                 break
 
         # Stop any processors
@@ -1533,11 +1516,10 @@ class SchedulerJob(BaseJob):
             return []
 
         if len(dagbag.dags) > 0:
-            self.logger.info("DAG(s) {} retrieved from {}"
+            self.logger.debug("DAG(s) {} retrieved from {}"
                              .format(dagbag.dags.keys(),
                                      file_path))
         else:
-            self.logger.warn("No viable dags retrieved from {}".format(file_path))
             self.update_import_errors(session, dagbag)
             return []
 

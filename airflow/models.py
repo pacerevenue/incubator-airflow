@@ -165,7 +165,6 @@ class DagBag(BaseDagBag, LoggingMixin):
             include_examples=configuration.getboolean('core', 'LOAD_EXAMPLES')):
 
         dag_folder = dag_folder or settings.DAGS_FOLDER
-        self.logger.info("Filling up the DagBag from {}".format(dag_folder))
         self.dag_folder = dag_folder
         self.dags = {}
         # the file's last modified timestamp when we last read it
@@ -320,13 +319,10 @@ class DagBag(BaseDagBag, LoggingMixin):
         Fails tasks that haven't had a heartbeat in too long
         """
         from airflow.jobs import LocalTaskJob as LJ
-        self.logger.info("Finding 'running' jobs without a recent heartbeat")
         TI = TaskInstance
         secs = (
             configuration.getint('scheduler', 'scheduler_zombie_task_threshold'))
         limit_dttm = datetime.now() - timedelta(seconds=secs)
-        self.logger.info(
-            "Failing jobs without heartbeat after {}".format(limit_dttm))
 
         tis = (
             session.query(TI)
